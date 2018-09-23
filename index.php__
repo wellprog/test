@@ -1,0 +1,135 @@
+<?php
+
+
+$dsn = 'mysql:host=localhost;dbname=qqq';
+$username = 'root';
+$password = '';
+$options = array(
+    PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8',
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+); 
+
+$db = new PDO($dsn, $username, $password, $options);
+
+
+
+//Добавление товара
+if (isset($_POST["action"]) &&  $_POST["action"] == "post_tovar") {
+    $ps = $db->prepare("INSERT INTO `tovar` (`id`, `name`, `description`) VALUES (NULL, :name, :description)");
+
+    $ps->execute(
+        [
+            "name" => $_POST["name"], 
+            "description" => $_POST["description"]
+        ]);
+
+    unset($_POST["action"]);
+}
+
+
+
+$ps = $db->prepare("
+SELECT 
+	tovar.*, 
+    `company`.`name` as cname, 
+    IF(ISNULL(SUM(`status`.`count`)), 0, SUM(`status`.`count`)) as t_count 
+FROM `tovar`
+LEFT JOIN `company` on `tovar`.`company_id` = `company`.`id`
+LEFT JOIN `status` on `status`.`tovar_id` = `tovar`.`id`
+GROUP BY `tovar`.`id`
+");
+$ps->execute();
+
+$tovari = $ps->fetchAll();
+
+$comp = [];
+$tovar = [];
+foreach ($tovari as $tk => $tv) {
+    if (!isset($comp[$tv["cname"]]))
+        $comp[$tv["cname"]] = [];
+
+    $comp[$tv["cname"]][] = $tv;
+}
+
+foreach ($tovari as $tk => $tv) {
+    $tovar[$tv["name"]] = true;
+}
+
+// var_dump($tovar); exit();
+
+
+
+if (!isset($_POST["action"])):
+?>
+
+
+<table border="1">
+    <tr>
+        <th>Компания</th>
+        <?php foreach ($tovar as $k => $v): ?>
+        <th><?= $k ?></th>
+        <?php endforeach; ?>
+        <th>Действия</th>
+    </tr>
+    <?php foreach ($comp as $k => $v): ?>
+    <tr>
+        <td><?= $k ?></td>
+        <?php 
+        foreach ($tovar as $tk => $tv): 
+            $vivod = "0";
+            foreach ($v as $ck => $cv) {
+                if ($cv["cname"] == $k && $cv["name"] == $ck) {
+                    $vivod = $cv["t_count"];
+                }
+            }
+        ?>
+        <td><?= $vivod ?></td>
+        <?php endforeach; ?>
+        <td>
+            <form method="post">
+                <input type="hidden" name="action" value="status" />
+                <input type="submit" value="Посмотреть статус" />
+            </form>
+        </td>
+    </tr>
+    <?php endforeach; ?>
+    <tr>
+        <td colspan="2">
+            <form method="POST">
+                <input type="hidden" name="action" value="add_tovar" />
+                <input type="submit" value="Добавить товар" />
+            </form>
+        </td>
+    </tr>
+    
+</table>
+
+<?php 
+    endif; 
+    if (isset($_POST["action"]) && $_POST["action"] == "add_tovar"):
+?>
+
+
+<form method="post">
+
+    <input type="hidden" name="action" value="post_tovar" />
+    <table>
+        <tr>
+            <th>Наименование</th>
+            <td><input type="text" name="name" /></td>
+        </tr>
+        <tr>
+            <th>Описание</th>
+            <td><input type="text" name="description" /></td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <input type="submit" value="отправить" />
+            </td>
+        </tr>
+    </table>
+
+
+</form>
+
+<?php  endif; ?>
